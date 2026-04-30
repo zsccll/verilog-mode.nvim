@@ -34,6 +34,8 @@ call s:InitVar('g:VerilogModeEmacsDefault', 1)
 call s:InitVar('g:VerilogModeUseScript', 1)
 call s:InitVar('g:VerilogModeScriptPath', '~/.emacs')
 call s:InitVar('g:VerilogModeEmacsPath', '')
+call s:InitVar('g:VerilogModeStripInlineComments', 0)
+call s:InitVar('g:VerilogModeStripAutoComments', 0)
 
 try
     if g:VerilogModeAddKey != ""
@@ -116,7 +118,7 @@ function M.run(cmd, srcbuf, tmpfile, expandtab_save, logfile)
             end
             vim.schedule(function()
                vim.api.nvim_set_current_buf(srcbuf)
-               local newcontent = vim.fn.readfile(vim.fn.fnameescape(tmpfile))
+               local newcontent = vim.fn.VerilogModeStripAutoComments(vim.fn.readfile(vim.fn.fnameescape(tmpfile)))
                if expandtab_save >= 0 then
                   vim.cmd('retab')
                   vim.bo.tabstop = expandtab_save
@@ -159,9 +161,36 @@ function s:GetScriptArgs()
    return ""
 endfunction
 
+function! s:StripAutoComments(lines)
+    if !g:VerilogModeStripInlineComments && !g:VerilogModeStripAutoComments
+        return a:lines
+    endif
+    let l:result = []
+    for l:line in a:lines
+        if g:VerilogModeStripInlineComments
+            let l:line = substitute(l:line, '\s*\/\/ Templated\(\s.*\)\?$', '', '')
+            let l:line = substitute(l:line, '\s*\/\/ Implicit .*$', '', '')
+        endif
+        if g:VerilogModeStripAutoComments
+            if l:line =~# '^\s*\/\/ \(Outputs\|Inputs\|Inouts\)\s*$'
+                continue
+            endif
+            if l:line =~# '^\s*\/\/ \(Beginning of automatic\|End of automatics\)'
+                continue
+            endif
+        endif
+        call add(l:result, l:line)
+    endfor
+    return l:result
+endfunction
+
+function! VerilogModeStripAutoComments(lines)
+    return s:StripAutoComments(a:lines)
+endfunction
+
 function! s:ApplyTmpFile(bufnr, tmpfile, expandtab_save)
    execute 'buffer ' . a:bufnr
-   let l:newcontent = readfile(fnameescape(a:tmpfile), '')
+   let l:newcontent = s:StripAutoComments(readfile(fnameescape(a:tmpfile), ''))
    if a:expandtab_save >= 0
       retab
       let &tabstop = a:expandtab_save

@@ -3,9 +3,9 @@ plan.md
 CLAUDE.md
 *.log
 filelist.f
-test_module*.sv
-test_module*.v
+test_*.sv
+test_*.v
 verilog-mode.el
 settings.local.json
-sub_sv*.sv
+sub*.sv
 sub_v/
