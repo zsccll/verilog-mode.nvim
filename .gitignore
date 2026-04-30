@@ -1,0 +1,11 @@
+.claude/
+plan.md
+CLAUDE.md
+*.log
+filelist.f
+test_module*.sv
+test_module*.v
+verilog-mode.el
+settings.local.json
+sub_sv*.sv
+sub_v/
