@@ -26,10 +26,14 @@ Plug 'zsccll/verilog-mode.nvim', {'for': ['verilog', 'systemverilog']}
 
 ## Usage
 
-| Key | Description |
+| Key / Command | Description |
 |-----|-------------|
 | `<leader>a` | Expand autos (`verilog-batch-auto`) |
 | `<leader>d` | Delete autos (`verilog-batch-delete-auto`) |
+| `<leader>i` | Inject autos into legacy files (`verilog-batch-inject-auto`) |
+| `:VerilogDiffAuto` | Open vimdiff comparing current file against re-expanded result |
+| `:VerilogBatchIndent` | Reformat whole file via Emacs indentation |
+| `:VerilogStripWS` | Strip trailing whitespace from all lines |
 
 In Neovim, a split window shows Emacs output. Press `<CR>` to close it and apply changes.
 
@@ -39,12 +43,15 @@ In Neovim, a split window shows Emacs output. Press `<CR>` to close it and apply
 |----------|---------|-------------|
 | `g:VerilogModeAddKey` | `<leader>a` | Key for expand autos |
 | `g:VerilogModeDeleteKey` | `<leader>d` | Key for delete autos |
+| `g:VerilogModeInjectKey` | `<leader>i` | Key for inject autos |
 | `g:VerilogModeEmacsPath` | `''` | Path to Emacs executable; empty means search in PATH |
 | `g:VerilogModeEmacsDefault` | `1` | `1`: use Emacs built-in verilog-mode; `0`: use `g:VerilogModeFile` |
 | `g:VerilogModeFile` | `~/.elisp/verilog-mode.el` | Path to custom [verilog-mode.el](https://github.com/veripool/verilog-mode/releases) (only when `EmacsDefault=0`) |
 | `g:VerilogModeUseScript` | `1` | Load an Emacs config script before processing |
 | `g:VerilogModeScriptPath` | `~/.emacs` | Path to Emacs config script |
 | `g:VerilogModeTrace` | `0` | `1`: write Emacs output to `verilog_emacs.log` in the file's directory |
+| `g:VerilogModeStripInlineComments` | `0` | `1`: strip `// Templated` and `// Implicit .*` comments after expansion |
+| `g:VerilogModeStripAutoComments` | `0` | `1`: also strip `// Outputs`/`// Inputs`/`// Inouts` headers and `// Beginning of automatic...`/`// End of automatics` block markers |
 
 ### Custom Emacs config
 

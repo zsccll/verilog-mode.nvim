@@ -33,9 +33,17 @@ call s:InitVar('g:VerilogModeTrace', 0)
 call s:InitVar('g:VerilogModeEmacsDefault', 1)
 call s:InitVar('g:VerilogModeUseScript', 1)
 call s:InitVar('g:VerilogModeScriptPath', '~/.emacs')
+call s:InitVar('g:VerilogModeInjectKey', '<leader>i')
 call s:InitVar('g:VerilogModeEmacsPath', '')
 call s:InitVar('g:VerilogModeStripInlineComments', 0)
 call s:InitVar('g:VerilogModeStripAutoComments', 0)
+
+try
+    if g:VerilogModeInjectKey != ""
+        exec 'nnoremap <silent><unique> ' g:VerilogModeInjectKey '<Plug>VerilogEmacsAutoInject'
+    endif
+catch /^Vim\%((\a\+)\)\=:E227/
+endtry
 
 try
     if g:VerilogModeAddKey != ""
@@ -53,8 +61,10 @@ endtry
 
 noremap <unique> <script> <Plug>VerilogEmacsAutoAdd    <SID>Add
 noremap <unique> <script> <Plug>VerilogEmacsAutoDelete <SID>Delete
+noremap <unique> <script> <Plug>VerilogEmacsAutoInject <SID>Inject
 noremap <SID>Add    :call <SID>Add()<CR>
 noremap <SID>Delete :call <SID>Delete()<CR>
+noremap <SID>Inject :call <SID>Inject()<CR>
 noremap <SID>EN_Default :call <SID>EN_Default()<CR>
 noremap <SID>Dis_Default :call <SID>Dis_Default()<CR>
 
@@ -129,6 +139,23 @@ function M.run(cmd, srcbuf, tmpfile, expandtab_save, logfile)
                vim.cmd('redraw!')
             end)
          end, {buffer = out_buf, nowait = true})
+      end,
+   })
+end
+function M.diff(cmd, srcbuf, tmpfile)
+   vim.fn.jobstart({'sh', '-c', cmd}, {
+      on_exit = function(_, _)
+         vim.schedule(function()
+            vim.api.nvim_set_current_buf(srcbuf)
+            vim.cmd('diffthis')
+            vim.cmd('vert diffsplit ' .. vim.fn.fnameescape(tmpfile))
+            local tmpbuf = vim.fn.bufnr(tmpfile)
+            vim.api.nvim_create_autocmd('BufDelete', {
+               buffer = tmpbuf,
+               once = true,
+               callback = function() vim.fn.delete(tmpfile) end,
+            })
+         end)
       end,
    })
 end
@@ -219,7 +246,9 @@ function s:RunAuto(action)
       endif
       let l:emacs_cmd .= "-l " . g:VerilogModeFile . " "
    endif
-   let l:batch_fn = a:action ==# 'add' ? 'verilog-batch-auto' : 'verilog-batch-delete-auto'
+   let l:batch_fn = {'add': 'verilog-batch-auto', 'delete': 'verilog-batch-delete-auto',
+            \ 'inject': 'verilog-batch-inject-auto', 'indent': 'verilog-batch-indent',
+            \ 'stripws': 'verilog-batch-delete-trailing-whitespace'}[a:action]
    let l:emacs_cmd .= l:script_args . " " . shellescape(l:tmpfile, 1) . " -f " . l:batch_fn
    let l:logfile = g:VerilogModeTrace ? expand("%:p:h") . "/verilog_emacs.log" : ''
    if has('nvim')
@@ -237,6 +266,10 @@ endfunction
 
 function s:Delete()
    call s:RunAuto('delete')
+endfunction
+
+function s:Inject()
+   call s:RunAuto('inject')
 endfunction
 
 function VerilogEmacsAutoFoldLevel(l)
@@ -257,6 +290,41 @@ function! VerilogEmacsAutoDelete()
     call s:Delete()
 endfunction
 
+function! VerilogEmacsAutoInject()
+    call s:Inject()
+endfunction
+
+function! VerilogEmacsRunAction(action)
+    call s:RunAuto(a:action)
+endfunction
+
+function! s:RunDiffAuto()
+   let l:tmpfile = expand("%:p:h") . "/." . expand("%:p:t")
+   silent! call writefile(getline(1, "$"), fnameescape(l:tmpfile), '')
+   let l:script_args = s:GetScriptArgs()
+   let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? shellescape(expand(g:VerilogModeEmacsPath)) : 'emacs'
+   let l:emacs_cmd = l:emacs_exe . " -batch --no-site-file "
+   if !g:VerilogModeEmacsDefault
+      if !filereadable(expand(g:VerilogModeFile))
+         echohl ErrorMsg | echom "VerilogMode: verilog-mode.el not found: " . g:VerilogModeFile | echohl None
+         return
+      endif
+      let l:emacs_cmd .= "-l " . g:VerilogModeFile . " "
+   endif
+   let l:emacs_cmd .= l:script_args . " " . shellescape(l:tmpfile, 1) . " -f verilog-batch-auto"
+   if has('nvim')
+      call luaeval('require("verilog_mode").diff(_A[1],_A[2],_A[3])',
+               \ [l:emacs_cmd, bufnr('%'), l:tmpfile])
+   else
+      call s:RunEmacs(l:emacs_cmd, '')
+      execute 'vert diffsplit ' . fnameescape(l:tmpfile)
+   endif
+endfunction
+
+function! VerilogEmacsRunDiffAuto()
+    call s:RunDiffAuto()
+endfunction
+
 if has('nvim')
 lua << EOF
 vim.api.nvim_create_user_command('VerilogBatchAuto',
@@ -265,5 +333,17 @@ vim.api.nvim_create_user_command('VerilogBatchAuto',
 vim.api.nvim_create_user_command('VerilogBatchDeleteAuto',
   function() vim.fn.VerilogEmacsAutoDelete() end,
   { desc = 'Verilog: delete autos (verilog-batch-delete-auto)' })
+vim.api.nvim_create_user_command('VerilogInjectAuto',
+  function() vim.fn.VerilogEmacsAutoInject() end,
+  { desc = 'Verilog: inject autos (verilog-batch-inject-auto)' })
+vim.api.nvim_create_user_command('VerilogBatchIndent',
+  function() vim.fn['VerilogEmacsRunAction']('indent') end,
+  { desc = 'Verilog: reindent file (verilog-batch-indent)' })
+vim.api.nvim_create_user_command('VerilogStripWS',
+  function() vim.fn['VerilogEmacsRunAction']('stripws') end,
+  { desc = 'Verilog: strip trailing whitespace (verilog-batch-delete-trailing-whitespace)' })
+vim.api.nvim_create_user_command('VerilogDiffAuto',
+  function() vim.fn.VerilogEmacsRunDiffAuto() end,
+  { desc = 'Verilog: diff stale AUTOs (verilog-batch-diff-auto)' })
 EOF
 endif
