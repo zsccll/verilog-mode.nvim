@@ -129,11 +129,11 @@ function M.run(cmd, srcbuf, tmpfile, expandtab_save, logfile)
             vim.schedule(function()
                vim.api.nvim_set_current_buf(srcbuf)
                local newcontent = vim.fn.VerilogModeStripAutoComments(vim.fn.readfile(vim.fn.fnameescape(tmpfile)))
+               vim.api.nvim_buf_set_lines(srcbuf, 0, -1, false, newcontent)
                if expandtab_save >= 0 then
                   vim.cmd('retab')
                   vim.bo.tabstop = expandtab_save
                end
-               vim.api.nvim_buf_set_lines(srcbuf, 0, -1, false, newcontent)
                vim.fn.delete(tmpfile)
                vim.cmd('write!')
                vim.cmd('redraw!')
@@ -218,13 +218,13 @@ endfunction
 function! s:ApplyTmpFile(bufnr, tmpfile, expandtab_save)
    execute 'buffer ' . a:bufnr
    let l:newcontent = s:StripAutoComments(readfile(fnameescape(a:tmpfile), ''))
-   if a:expandtab_save >= 0
-      retab
-      let &tabstop = a:expandtab_save
-   endif
    call setline(1, l:newcontent)
    if line('$') > len(l:newcontent)
       call deletebufline('%', len(l:newcontent) + 1, line('$'))
+   endif
+   if a:expandtab_save >= 0
+      retab
+      let &tabstop = a:expandtab_save
    endif
    call delete(a:tmpfile)
    w! %
