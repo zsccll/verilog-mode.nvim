@@ -52,6 +52,7 @@ In Neovim, a split window shows Emacs output. Press `<CR>` to close it and apply
 | `g:VerilogModeTrace` | `0` | `1`: write Emacs output to `verilog_emacs.log` in the file's directory |
 | `g:VerilogModeStripInlineComments` | `0` | `1`: strip `// Templated` and `// Implicit .*` comments after expansion |
 | `g:VerilogModeStripAutoComments` | `0` | `1`: also strip `// Outputs`/`// Inputs`/`// Inouts` headers and `// Beginning of automatic...`/`// End of automatics` block markers |
+| `g:VerilogModeLibraryFiles` | `[]` | `.f` file paths passed to Emacs as `verilog-library-flags`; only appended to the temporary file used for expansion |
 
 ### Custom Emacs config
 
@@ -76,6 +77,23 @@ verilog-mode's filename lookup is case-sensitive. Use a `.f` filelist to bypass 
 ./sub_sv_2.sv
 ./sub_sv_4.sv
 ```
+
+You can also configure filelists globally without adding Local Variables to each source file:
+
+```vimscript
+let g:VerilogModeLibraryFiles = ['$CFG_DIR/DUT.f']
+```
+
+Multiple filelists are supported:
+
+```vimscript
+let g:VerilogModeLibraryFiles = [
+      \ '$CFG_DIR/DUT.f',
+      \ '$CFG_DIR/common.f',
+      \]
+```
+
+When set, the plugin appends equivalent `verilog-library-flags` only to the temporary file passed to Emacs. The original Verilog/SystemVerilog file is not modified. If the source file already contains `verilog-library-flags`, the configured list is skipped for that file. Missing filelists are skipped with a warning.
 
 ### Windows
 

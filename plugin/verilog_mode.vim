@@ -37,6 +37,7 @@ call s:InitVar('g:VerilogModeInjectKey', '<leader>i')
 call s:InitVar('g:VerilogModeEmacsPath', '')
 call s:InitVar('g:VerilogModeStripInlineComments', 0)
 call s:InitVar('g:VerilogModeStripAutoComments', 0)
+call s:InitVar('g:VerilogModeLibraryFiles', [])
 
 try
     if g:VerilogModeInjectKey != ""
@@ -211,6 +212,58 @@ function! s:StripAutoComments(lines)
     return l:result
 endfunction
 
+function! s:EscapeElispString(value)
+    let l:value = substitute(a:value, '\\', '\\\\', 'g')
+    return substitute(l:value, '"', '\\"', 'g')
+endfunction
+
+function! s:HasLibraryFlags(lines)
+    for l:line in a:lines
+        if l:line =~# 'verilog-library-flags\s*:'
+            return 1
+        endif
+    endfor
+    return 0
+endfunction
+
+function! s:IsReadableLibraryFile(file)
+   return filereadable(expand(a:file))
+endfunction
+
+function! s:TmpFileLines()
+   let l:lines = getline(1, "$")
+   if empty(g:VerilogModeLibraryFiles) || s:HasLibraryFlags(l:lines)
+      return l:lines
+   endif
+
+   let l:flags = []
+   for l:file in g:VerilogModeLibraryFiles
+      if type(l:file) != type('') || l:file ==# ''
+         continue
+      endif
+      if !s:IsReadableLibraryFile(l:file)
+         echohl WarningMsg | echom "VerilogMode: library file not found, skipped: " . l:file | echohl None
+         continue
+      endif
+      call add(l:flags, '"-f"')
+      call add(l:flags, '"' . s:EscapeElispString(l:file) . '"')
+   endfor
+
+   if empty(l:flags)
+      return l:lines
+   endif
+
+   return l:lines + [
+            \ '// Local Variables:',
+            \ '// verilog-library-flags:(' . join(l:flags, ' ') . ')',
+            \ '// End:',
+            \ ]
+endfunction
+
+function! s:WriteTmpFile(tmpfile)
+   silent! call writefile(s:TmpFileLines(), fnameescape(a:tmpfile), '')
+endfunction
+
 function! VerilogModeStripAutoComments(lines)
     return s:StripAutoComments(a:lines)
 endfunction
@@ -235,7 +288,7 @@ function s:RunAuto(action)
    let l:expandtab_save = (a:action ==# 'add' && &expandtab) ? &tabstop : -1
    if a:action ==# 'add' && &expandtab | let &tabstop = 8 | endif
    let l:tmpfile = expand("%:p:h") . "/." . expand("%:p:t")
-   silent! call writefile(getline(1, "$"), fnameescape(l:tmpfile), '')
+   call s:WriteTmpFile(l:tmpfile)
    let l:script_args = s:GetScriptArgs()
    let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? shellescape(expand(g:VerilogModeEmacsPath)) : 'emacs'
    let l:emacs_cmd = l:emacs_exe . " -batch --no-site-file "
@@ -300,7 +353,7 @@ endfunction
 
 function! s:RunDiffAuto()
    let l:tmpfile = expand("%:p:h") . "/." . expand("%:p:t")
-   silent! call writefile(getline(1, "$"), fnameescape(l:tmpfile), '')
+   call s:WriteTmpFile(l:tmpfile)
    let l:script_args = s:GetScriptArgs()
    let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? shellescape(expand(g:VerilogModeEmacsPath)) : 'emacs'
    let l:emacs_cmd = l:emacs_exe . " -batch --no-site-file "
