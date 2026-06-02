@@ -28,11 +28,11 @@ Plug 'zsccll/verilog-mode.nvim', {'for': ['verilog', 'systemverilog']}
 
 | Key / Command | Description |
 |-----|-------------|
-| `<leader>a` | Expand autos (`verilog-batch-auto`) |
-| `<leader>d` | Delete autos (`verilog-batch-delete-auto`) |
-| `<leader>i` | Inject autos into legacy files (`verilog-batch-inject-auto`) |
+| `<leader>a` | Expand AUTOs in the current file |
+| `<leader>d` | Delete generated AUTO sections |
+| `<leader>i` | Inject AUTO markers into legacy files |
 | `:VerilogDiffAuto` | Open vimdiff comparing current file against re-expanded result |
-| `:VerilogBatchIndent` | Reformat whole file via Emacs indentation |
+| `:VerilogBatchIndent` | Reformat the current file |
 | `:VerilogStripWS` | Strip trailing whitespace from all lines |
 
 In Neovim, a split window shows Emacs output. Press `<CR>` to close it and apply changes.
@@ -52,7 +52,7 @@ In Neovim, a split window shows Emacs output. Press `<CR>` to close it and apply
 | `g:VerilogModeTrace` | `0` | `1`: write Emacs output to `verilog_emacs.log` in the file's directory |
 | `g:VerilogModeStripInlineComments` | `0` | `1`: strip `// Templated` and `// Implicit .*` comments after expansion |
 | `g:VerilogModeStripAutoComments` | `0` | `1`: also strip `// Outputs`/`// Inputs`/`// Inouts` headers and `// Beginning of automatic...`/`// End of automatics` block markers |
-| `g:VerilogModeLibraryFiles` | `[]` | `.f` file paths passed to Emacs as `verilog-library-flags`; only appended to the temporary file used for expansion |
+| `g:VerilogModeLibraryFiles` | `[]` | `.f` file paths used for module lookup |
 
 ### Custom Emacs config
 
@@ -93,7 +93,7 @@ let g:VerilogModeLibraryFiles = [
       \]
 ```
 
-When set, the plugin appends equivalent `verilog-library-flags` only to the temporary file passed to Emacs. The original Verilog/SystemVerilog file is not modified. If the source file already contains `verilog-library-flags`, the configured list is skipped for that file. Missing filelists are skipped with a warning.
+When set, these filelists are used for module lookup without requiring Local Variables in each source file. If a source file already defines `verilog-library-flags`, that per-file setting takes priority. Missing filelists are skipped with a warning.
 
 ### Windows
 
@@ -105,4 +105,4 @@ let g:VerilogModeFile = 'D:/emacs/site-lisp/verilog-mode.el'
 ## Acknowledgements
 
 - [verilog_emacsauto.vim](https://github.com/vim-scripts/verilog_emacsauto.vim) by Vim — original plugin this project is based on
-- [verilog-mode](https://github.com/veripool/verilog-mode) by Wilson Snyder et al. — the Emacs verilog-mode that does the actual AUTO expansion
+- [verilog-mode](https://github.com/veripool/verilog-mode) by Wilson Snyder et al.

@@ -181,7 +181,7 @@ function s:GetScriptArgs()
          if s:is_win
             let l:path = substitute(l:path, '\\', '/', 'g')
          endif
-         return " -l " . shellescape(l:path)
+         return " -l " . s:CommandShellEscape(l:path)
       else
          echohl WarningMsg | echom "VerilogMode: script file not found: " . g:VerilogModeScriptPath | echohl None
       endif
@@ -217,6 +217,14 @@ function! s:EscapeElispString(value)
     return substitute(l:value, '"', '\\"', 'g')
 endfunction
 
+function! s:PosixShellEscape(value)
+    return "'" . substitute(a:value, "'", "'\"'\"'", 'g') . "'"
+endfunction
+
+function! s:CommandShellEscape(value)
+    return has('nvim') ? s:PosixShellEscape(a:value) : shellescape(a:value, 1)
+endfunction
+
 function! s:HasLibraryFlags(lines)
     for l:line in a:lines
         if l:line =~# 'verilog-library-flags\s*:'
@@ -231,9 +239,12 @@ function! s:IsReadableLibraryFile(file)
 endfunction
 
 function! s:TmpFileLines()
-   let l:lines = getline(1, "$")
-   if empty(g:VerilogModeLibraryFiles) || s:HasLibraryFlags(l:lines)
-      return l:lines
+   return getline(1, "$")
+endfunction
+
+function! s:GetLibraryFlagsArgs()
+   if empty(g:VerilogModeLibraryFiles) || s:HasLibraryFlags(getline(1, "$"))
+      return ""
    endif
 
    let l:flags = []
@@ -250,14 +261,11 @@ function! s:TmpFileLines()
    endfor
 
    if empty(l:flags)
-      return l:lines
+      return ""
    endif
 
-   return l:lines + [
-            \ '// Local Variables:',
-            \ '// verilog-library-flags:(' . join(l:flags, ' ') . ')',
-            \ '// End:',
-            \ ]
+   let l:expr = '(setq verilog-library-flags (list ' . join(l:flags, ' ') . '))'
+   return " --eval " . s:CommandShellEscape(l:expr)
 endfunction
 
 function! s:WriteTmpFile(tmpfile)
@@ -290,19 +298,19 @@ function s:RunAuto(action)
    let l:tmpfile = expand("%:p:h") . "/." . expand("%:p:t")
    call s:WriteTmpFile(l:tmpfile)
    let l:script_args = s:GetScriptArgs()
-   let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? shellescape(expand(g:VerilogModeEmacsPath)) : 'emacs'
+   let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? s:CommandShellEscape(expand(g:VerilogModeEmacsPath)) : 'emacs'
    let l:emacs_cmd = l:emacs_exe . " -batch --no-site-file "
    if !g:VerilogModeEmacsDefault
       if !filereadable(expand(g:VerilogModeFile))
          echohl ErrorMsg | echom "VerilogMode: verilog-mode.el not found: " . g:VerilogModeFile | echohl None
          return
       endif
-      let l:emacs_cmd .= "-l " . g:VerilogModeFile . " "
+      let l:emacs_cmd .= "-l " . s:CommandShellEscape(expand(g:VerilogModeFile)) . " "
    endif
    let l:batch_fn = {'add': 'verilog-batch-auto', 'delete': 'verilog-batch-delete-auto',
             \ 'inject': 'verilog-batch-inject-auto', 'indent': 'verilog-batch-indent',
             \ 'stripws': 'verilog-batch-delete-trailing-whitespace'}[a:action]
-   let l:emacs_cmd .= l:script_args . " " . shellescape(l:tmpfile, 1) . " -f " . l:batch_fn
+   let l:emacs_cmd .= l:script_args . s:GetLibraryFlagsArgs() . " " . s:CommandShellEscape(l:tmpfile) . " -f " . l:batch_fn
    let l:logfile = g:VerilogModeTrace ? expand("%:p:h") . "/verilog_emacs.log" : ''
    if has('nvim')
       call luaeval('require("verilog_mode").run(_A[1],_A[2],_A[3],_A[4],_A[5])',
@@ -355,16 +363,16 @@ function! s:RunDiffAuto()
    let l:tmpfile = expand("%:p:h") . "/." . expand("%:p:t")
    call s:WriteTmpFile(l:tmpfile)
    let l:script_args = s:GetScriptArgs()
-   let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? shellescape(expand(g:VerilogModeEmacsPath)) : 'emacs'
+   let l:emacs_exe = g:VerilogModeEmacsPath !=# '' ? s:CommandShellEscape(expand(g:VerilogModeEmacsPath)) : 'emacs'
    let l:emacs_cmd = l:emacs_exe . " -batch --no-site-file "
    if !g:VerilogModeEmacsDefault
       if !filereadable(expand(g:VerilogModeFile))
          echohl ErrorMsg | echom "VerilogMode: verilog-mode.el not found: " . g:VerilogModeFile | echohl None
          return
       endif
-      let l:emacs_cmd .= "-l " . g:VerilogModeFile . " "
+      let l:emacs_cmd .= "-l " . s:CommandShellEscape(expand(g:VerilogModeFile)) . " "
    endif
-   let l:emacs_cmd .= l:script_args . " " . shellescape(l:tmpfile, 1) . " -f verilog-batch-auto"
+   let l:emacs_cmd .= l:script_args . s:GetLibraryFlagsArgs() . " " . s:CommandShellEscape(l:tmpfile) . " -f verilog-batch-auto"
    if has('nvim')
       call luaeval('require("verilog_mode").diff(_A[1],_A[2],_A[3])',
                \ [l:emacs_cmd, bufnr('%'), l:tmpfile])
